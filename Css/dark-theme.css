@@ -1,0 +1,443 @@
+/* ==========================================================================
+   dark-theme.css  —  Cardioa ECG  (additive dark mode)
+
+   HOW IT WORKS
+   - Every dark rule lives under [data-theme="dark"] on <html>. Remove that
+     attribute and the site is byte-for-byte the original design again.
+   - Only colour-related properties are changed. No sizes, spacing, fonts,
+     animations, breakpoints or DOM structure are touched.
+   - Load this file AFTER styles.css, responsive.css and font-style.css.
+     Several selectors tie in specificity with the originals on purpose and
+     rely on being last; a few are re-declared for exactly that reason.
+   - The manual toggle / system-preference logic is in dark-theme.js.
+
+   SECTIONS
+     1. Variables        5. Forms & display controls
+     2. Base             6. Media (logo, ECG canvas, images)
+     3. Layout           7. Utilities & generic element defaults
+     4. Components       8. Theme toggle button (new element, both themes)
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. VARIABLES  — the only place colours are defined
+   ========================================================================== */
+:root[data-theme="dark"] {
+  color-scheme: dark; /* native controls, scrollbars, spin buttons, autofill */
+
+  /* ---- Existing site tokens, re-pointed (names unchanged) ---------------- */
+  --bg: #0f1514;
+  --bg-gradient: linear-gradient(
+    230deg,
+    #0f1514 0%,
+    #10201a 19%,
+    #0f1514 37%,
+    #123024 60%,
+    #101c17 81%,
+    #133226 99%
+  );
+  --panel: #141b19;
+  --panel-alt: #18211e;
+  --border: rgba(255, 255, 255, 0.14);
+  --text: #e8eeeb;
+  --muted: #b0bfb8;
+  --accent-text: #6bf0b0; /* brand mint is readable on dark; #17b06f was not */
+  --accent-soft: rgba(107, 240, 176, 0.12);
+  --brand-strong: #3ddc97;
+  --danger: #ff6b70;
+  --warning: #e8b13a;
+  /* --brand, --accent, --brand-ink, --gray-logo, --glass-blur: unchanged */
+
+  /* ---- New dark-only tokens ---------------------------------------------- */
+  /* glass surfaces (.panel, .stat-card, .badge) */
+  --dk-glass: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.075),
+    rgba(255, 255, 255, 0.03)
+  );
+  --dk-glass-border: rgba(255, 255, 255, 0.12);
+  --dk-glass-shadow: rgba(0, 0, 0, 0.45);
+  --dk-glass-inset: rgba(255, 255, 255, 0.07);
+  --dk-glass-accent: linear-gradient(
+    135deg,
+    rgba(107, 240, 176, 0.18),
+    rgba(255, 255, 255, 0.03)
+  );
+  --dk-glass-accent-border: rgba(107, 240, 176, 0.28);
+  --dk-online-border: rgba(107, 240, 176, 0.4);
+
+  /* buttons */
+  --dk-btn-bg: rgba(255, 255, 255, 0.09);
+  --dk-btn-ghost-bg: rgba(255, 255, 255, 0.04);
+  --dk-btn-off-bg: rgba(255, 255, 255, 0.04);
+  --dk-btn-danger-bg: rgba(160, 160, 160, 0.2);
+  --dk-btn-secondary-border: rgba(107, 240, 176, 0.32);
+  --dk-btn-primary-glow: rgba(107, 240, 176, 0.22);
+  --dk-btn-hover: 1.14; /* brightness() factor on hover */
+
+  /* messages */
+  --dk-msg-border: rgba(255, 255, 255, 0.12);
+  --dk-msg-info-bg: rgba(255, 255, 255, 0.06);
+  --dk-msg-info-text: #d5e1db;
+  --dk-msg-success-bg: rgba(107, 240, 176, 0.12);
+  --dk-msg-success-text: #6bf0b0;
+  --dk-msg-success-border: rgba(107, 240, 176, 0.35);
+  --dk-msg-error-bg: rgba(229, 72, 77, 0.14);
+  --dk-msg-error-text: #ffb3b5;
+  --dk-msg-error-border: rgba(229, 72, 77, 0.4);
+  --dk-msg-warning-bg: rgba(224, 165, 38, 0.12);
+  --dk-msg-warning-text: #f5cd70;
+  --dk-msg-warning-border: rgba(224, 165, 38, 0.4);
+
+  /* display-settings panel, inputs, switch */
+  --dk-inner-bg: rgba(255, 255, 255, 0.04);
+  --dk-inner-border: rgba(255, 255, 255, 0.1);
+  --dk-field-bg: rgba(255, 255, 255, 0.05);
+  --dk-field-border: #9aa6a0; /* >= 3:1 against the surface (WCAG 1.4.11) */
+  --dk-field-inset: rgba(0, 0, 0, 0.35);
+  --dk-field-disabled-bg: rgba(255, 255, 255, 0.02);
+  --dk-field-disabled-border: rgba(255, 255, 255, 0.16);
+  --dk-focus-ring: rgba(107, 240, 176, 0.3);
+  --dk-switch-off: #7f8d85;
+  --dk-switch-knob-on: #0b3d29; /* = --brand-ink, contrast 8.6:1 on mint */
+
+  /* ECG canvas */
+  --dk-canvas-bg: #0b100f;
+  --dk-canvas-border: rgba(107, 240, 176, 0.3);
+  --dk-canvas-hint: #8fa39a;
+  /* app.js paints the canvas white (#fff) with mint (#68efad) trace every
+     frame; CSS cannot recolour canvas pixels, so this filter maps
+     white -> black and mint -> ~mint (measured: #68efad -> #6dedb4).
+     Combined with mix-blend-mode: screen the black becomes --dk-canvas-bg. */
+  --dk-canvas-filter: invert(1) hue-rotate(195deg) saturate(0.5)
+    brightness(3.3);
+
+  /* misc */
+  --dk-focus-outline: #6bf0b0;
+  --dk-selection: rgba(107, 240, 176, 0.35);
+  --dk-scroll-thumb: #3b4a44;
+  --dk-scroll-track: #0f1514;
+  --dk-link: #6bf0b0;
+  --dk-link-visited: #9fd8bf;
+  --dk-link-hover: #b5f8d8;
+  --dk-code-bg: rgba(255, 255, 255, 0.07);
+  --dk-img-dim: 0.92; /* brightness() for future photos */
+}
+
+
+/* ==========================================================================
+   2. BASE
+   ========================================================================== */
+/* html background comes from --bg / --bg-gradient (already variable-driven).
+   Scrollbars: colour only, no width change. */
+:root[data-theme="dark"] {
+  scrollbar-color: var(--dk-scroll-thumb) var(--dk-scroll-track);
+}
+
+/* Same geometry as styles.css (18% 0 / 28rem, 100% 42% / 32rem); only the
+   mint tint is quieter. */
+[data-theme="dark"] body {
+  background:
+    radial-gradient(
+      circle at 18% 0%,
+      rgba(107, 240, 176, 0.06),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 100% 42%,
+      rgba(107, 240, 176, 0.04),
+      transparent 32rem
+    );
+  color: var(--text);
+}
+
+[data-theme="dark"] ::selection {
+  background: var(--dk-selection);
+  color: #ffffff;
+}
+
+/* Keyboard focus: colour only. Uses the browser's own outline (no new
+   width/offset), so nothing shifts. */
+[data-theme="dark"] :focus-visible {
+  outline-color: var(--dk-focus-outline);
+}
+
+
+/* ==========================================================================
+   3. LAYOUT
+   ========================================================================== */
+/* .app-shell, .topbar, .brand-area, .brand-copy, .eyebrow, h2, .muted use
+   only var(--border / --muted / --accent-text) — already themed by section 1.
+   Nothing to override here. */
+
+
+/* ==========================================================================
+   4. COMPONENTS
+   ========================================================================== */
+
+/* ---- Glass surfaces ------------------------------------------------------ */
+[data-theme="dark"] .panel,
+[data-theme="dark"] .stat-card,
+[data-theme="dark"] .badge {
+  background: var(--dk-glass);
+  border-color: var(--dk-glass-border);
+  box-shadow:
+    0 8px 32px var(--dk-glass-shadow),
+    inset 0 1px 0 var(--dk-glass-inset);
+}
+/* responsive.css fallback for browsers without backdrop-filter is
+   `.panel,.stat-card,.badge {background: rgba(255,255,255,.92)}` (specificity
+   0,1,0) — the rule above (0,2,0) already beats it, so those browsers get a
+   translucent dark surface instead of a white slab. */
+
+[data-theme="dark"] .heart-rate-card {
+  background: var(--dk-glass-accent);
+  border-color: var(--dk-glass-accent-border);
+}
+
+/* ---- Connection badge ----------------------------------------------------
+   .badge.online must come after the .badge rule above (equal specificity). */
+[data-theme="dark"] .badge.online {
+  border-color: var(--dk-online-border);
+}
+/* .badge .dot / .online .dot / .connecting .dot use --danger, --brand-strong,
+   --warning: themed by variables. The mint glow on the online dot stays. */
+
+/* ---- Buttons --------------------------------------------------------------
+   Each variant is re-declared because `.btn` (mine) ties with `.btn.primary`
+   etc. in the original CSS and loads later. */
+[data-theme="dark"] .btn {
+  background: var(--dk-btn-bg);
+  color: var(--text);
+}
+[data-theme="dark"] .btn:hover:not(:disabled) {
+  /* original: brightness(.97) — invisible on dark, so brighten instead */
+  filter: brightness(var(--dk-btn-hover));
+}
+[data-theme="dark"] .btn.primary {
+  background: var(--accent);
+  color: var(--brand-ink);
+  box-shadow: 0 6px 18px var(--dk-btn-primary-glow);
+}
+[data-theme="dark"] .btn.secondary {
+  background: var(--accent-soft);
+  border-color: var(--dk-btn-secondary-border);
+  color: var(--accent-text);
+}
+/* "Show data" toggle in its off state (specificity 0,4,0 > original 0,3,0) */
+[data-theme="dark"] .btn.secondary[aria-pressed="false"] {
+  background: var(--dk-btn-off-bg);
+  border-color: var(--border);
+  color: var(--muted);
+}
+[data-theme="dark"] .btn.danger {
+  background: var(--dk-btn-danger-bg);
+  color: var(--text);
+}
+[data-theme="dark"] .btn.ghost {
+  background: var(--dk-btn-ghost-bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+/* .btn.ghost:hover border (--brand-strong) is variable-driven. */
+
+/* ---- Status message (#message, classes set by app.js setMessage) --------- */
+[data-theme="dark"] .message {
+  border-color: var(--dk-msg-border);
+}
+[data-theme="dark"] .message.info {
+  color: var(--dk-msg-info-text);
+  background: var(--dk-msg-info-bg);
+}
+[data-theme="dark"] .message.success {
+  color: var(--dk-msg-success-text);
+  background: var(--dk-msg-success-bg);
+  border-color: var(--dk-msg-success-border);
+}
+[data-theme="dark"] .message.error {
+  color: var(--dk-msg-error-text);
+  background: var(--dk-msg-error-bg);
+  border-color: var(--dk-msg-error-border);
+}
+[data-theme="dark"] .message.warning {
+  color: var(--dk-msg-warning-text);
+  background: var(--dk-msg-warning-bg);
+  border-color: var(--dk-msg-warning-border);
+}
+
+/* ---- Stat cards / range row ----------------------------------------------
+   .stat-card span, .heart-rate-value strong/em, .range-row, .range-row b,
+   .measurement-note use var(--muted/--text/--accent-text): themed already. */
+
+
+/* ==========================================================================
+   5. FORMS & DISPLAY CONTROLS
+   ========================================================================== */
+[data-theme="dark"] .display-settings {
+  background: var(--dk-inner-bg);
+  border-color: var(--dk-inner-border);
+  box-shadow: inset 0 1px 0 var(--dk-glass-inset);
+}
+
+[data-theme="dark"] .setting-input-wrap {
+  background: var(--dk-field-bg);
+  border-color: var(--dk-field-border);
+  box-shadow: inset 0 1px 2px var(--dk-field-inset);
+}
+/* Must follow the rule above (equal specificity) or the focus ring is lost. */
+[data-theme="dark"] .setting-input-wrap:focus-within {
+  border-color: var(--brand-strong);
+  box-shadow: 0 0 0 3px var(--dk-focus-ring);
+}
+/* Original disabled rule has specificity 0,3,0 — needs 0,4,0 to win. */
+[data-theme="dark"] .display-setting.disabled .setting-input-wrap {
+  background: var(--dk-field-disabled-bg);
+  border-color: var(--dk-field-disabled-border);
+}
+[data-theme="dark"] .setting-input-wrap input {
+  color: var(--text);
+  caret-color: var(--accent-text);
+}
+
+/* Toggle switch (Auto Scale). Knob stays white when off. */
+[data-theme="dark"] .slider {
+  background: var(--dk-switch-off);
+}
+/* checked track = var(--accent): original rule (0,3,1) already wins. */
+[data-theme="dark"] .switch input:checked + .slider::before {
+  background: var(--dk-switch-knob-on); /* white-on-mint was 1.3:1 */
+}
+/* The real <input> is opacity:0 / 0x0, so keyboard focus was invisible in
+   the original. Colour-only outline on the visible track, dark theme only. */
+[data-theme="dark"] .switch input:focus-visible + .slider {
+  outline: 2px solid var(--dk-focus-outline);
+  outline-offset: 2px;
+}
+
+[data-theme="dark"] ::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+
+
+/* ==========================================================================
+   6. MEDIA
+   ========================================================================== */
+
+/* ---- Logo (.brand-logo -> icons/cardioa_logo.png) -------------------------
+   Transparent PNG, mint + light-gray artwork: already legible on dark
+   (verified against #0f1514). No change needed. */
+
+/* ---- ECG canvas ----------------------------------------------------------- */
+[data-theme="dark"] .canvas-wrap {
+  background: var(--dk-canvas-bg);
+  border-color: var(--dk-canvas-border);
+  /* Own compositing group so the canvas blends with THIS background only
+     (not with the glass panel behind it). Colour-blending only; no layout. */
+  isolation: isolate;
+}
+[data-theme="dark"] #ecgCanvas {
+  filter: var(--dk-canvas-filter);
+  mix-blend-mode: screen;
+}
+[data-theme="dark"] .empty-hint {
+  color: var(--dk-canvas-hint);
+}
+
+/* ---- Images (none besides the logo today; future-proofing) ---------------- */
+[data-theme="dark"] img:not(.brand-logo) {
+  filter: brightness(var(--dk-img-dim));
+}
+
+
+/* ==========================================================================
+   7. UTILITIES & GENERIC ELEMENT DEFAULTS
+   The project currently has no links, code, tables, selects, textareas,
+   modals, tooltips, tabs or pagination. These few rules keep any that get
+   added later from turning up light-on-light. They match nothing today.
+   ========================================================================== */
+[data-theme="dark"] a:link {
+  color: var(--dk-link);
+}
+[data-theme="dark"] a:visited {
+  color: var(--dk-link-visited);
+}
+[data-theme="dark"] a:hover {
+  color: var(--dk-link-hover);
+}
+[data-theme="dark"] code,
+[data-theme="dark"] kbd,
+[data-theme="dark"] pre {
+  background: var(--dk-code-bg);
+  color: var(--text);
+}
+[data-theme="dark"] th,
+[data-theme="dark"] td {
+  border-color: var(--border);
+}
+[data-theme="dark"] hr {
+  border-color: var(--border);
+}
+
+/* Opt-in helper for a dark-on-transparent image added later:
+   <img class="dt-invert" …>  (element-scoped; never applied to the page). */
+[data-theme="dark"] .dt-invert {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+
+/* ==========================================================================
+   8. THEME TOGGLE BUTTON  (.dt-toggle — created by dark-theme.js)
+   A brand-new element, fixed to a corner, so it does not reflow anything.
+   Styled for both themes because it must be usable in both.
+   ========================================================================== */
+.dt-toggle {
+  position: fixed;
+  inset-block-end: max(16px, env(safe-area-inset-bottom, 0px));
+  inset-inline-start: max(16px, env(safe-area-inset-right, 0px));
+  z-index: 1000;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid #c5d3cb;
+  background: rgba(255, 255, 255, 0.92);
+  color: #1c2622;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+  -webkit-tap-highlight-color: transparent;
+}
+.dt-toggle:hover {
+  border-color: #17b06f;
+}
+.dt-toggle:focus-visible {
+  outline: 2px solid #0e7a4c;
+  outline-offset: 2px;
+}
+.dt-toggle svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  fill: currentColor;
+  pointer-events: none;
+}
+/* light theme shows the moon (action = go dark); dark theme shows the sun */
+.dt-toggle .dt-sun { display: none; }
+.dt-toggle .dt-moon { display: block; }
+
+:root[data-theme="dark"] .dt-toggle {
+  background: rgba(24, 33, 30, 0.94);
+  border-color: #5f6f67;
+  color: #e8eeeb;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+:root[data-theme="dark"] .dt-toggle:hover {
+  border-color: #6bf0b0;
+}
+:root[data-theme="dark"] .dt-toggle:focus-visible {
+  outline-color: #6bf0b0;
+}
+:root[data-theme="dark"] .dt-toggle .dt-sun { display: block; }
+:root[data-theme="dark"] .dt-toggle .dt-moon { display: none; }

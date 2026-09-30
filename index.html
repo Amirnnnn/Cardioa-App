@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#ffffff" />
+    <meta
+      name="description"
+      content="Cardioa - نمایش زنده ECG تک‌کاناله از طریق Bluetooth Low Energy"
+    />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/Cardioa_Icon.png" />
+    <link rel="stylesheet" href="./Css/dark-theme.css" />
+    <link rel="stylesheet" href="./Css/font-style.css" />
+    <link rel="stylesheet" href="./Css/responsive.css" />
+    <link rel="stylesheet" href="./Css/styles.css" />
+    <title>Cardioa | ECG Monitor</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand-area">
+          <img
+            src="./icons/cardioa_logo.png"
+            alt="Cardioa"
+            class="brand-logo"
+          />
+          <div class="brand-copy">
+            <div class="eyebrow">SINGLE-CHANNEL ECG</div>
+            <p>نمایش زنده سیگنال قلب</p>
+          </div>
+        </div>
+
+        <div id="connectionBadge" class="badge offline" aria-live="polite">
+          <span class="dot"></span>
+          <span id="connectionText">قطع</span>
+        </div>
+      </header>
+
+      <section class="panel controls compact-controls">
+        <div>
+          <h2>اتصال دستگاه</h2>
+          <p class="muted">
+            برای مشاهده سیگنال، Cardioa را به دستگاه ECG متصل کنید.
+          </p>
+        </div>
+        <div class="button-row">
+          <button id="connectBtn" class="btn primary">اتصال به دستگاه</button>
+          <button id="disconnectBtn" class="btn danger" disabled>
+            قطع اتصال
+          </button>
+          <button id="demoBtn" class="btn secondary">تست نمودار</button>
+          <button
+            id="statsToggleBtn"
+            class="btn secondary"
+            type="button"
+            aria-pressed="true"
+            aria-controls="statsGrid"
+          >
+            نمایش داده ها
+          </button>
+        </div>
+        <div id="message" class="message" hidden aria-live="polite"></div>
+      </section>
+
+      <section id="statsGrid" class="stats-grid">
+        <article class="stat-card heart-rate-card">
+          <span>Heart Rate</span>
+          <div class="heart-rate-value">
+            <strong id="heartRate">—</strong>
+            <em>BPM</em>
+          </div>
+        </article>
+        <article class="stat-card">
+          <span>دستگاه</span><strong id="deviceName">—</strong>
+        </article>
+        <article class="stat-card">
+          <span>آخرین مقدار</span><strong id="lastValue">—</strong>
+        </article>
+        <article class="stat-card">
+          <span>Sampleها</span><strong id="sampleCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Packetها</span><strong id="packetCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>نرخ دریافتی</span><strong id="rxRate">0 Hz</strong>
+        </article>
+        <article class="stat-card">
+          <span>ضبط</span><strong id="recordState">خاموش</strong>
+        </article>
+      </section>
+
+      <section class="panel chart-panel">
+        <div class="panel-title-row">
+          <div>
+            <h2>ECG Live</h2>
+            <p class="muted">سیگنال دریافتی به‌صورت زنده نمایش داده می‌شود.</p>
+          </div>
+          <div class="chart-actions">
+            <button id="recordBtn" class="btn ghost small">شروع ضبط</button>
+            <button id="exportBtn" class="btn ghost small" disabled>CSV</button>
+            <button id="printBtn" class="btn ghost small" disabled>
+              پرینت ECG
+            </button>
+            <button id="clearBtn" class="btn ghost small">پاک کردن</button>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="ecgCanvas"></canvas>
+          <div id="emptyHint" class="empty-hint">منتظر دریافت سیگنال...</div>
+        </div>
+
+        <div class="display-settings" aria-label="تنظیمات نمایش ECG">
+          <div class="display-setting">
+            <label for="sampleRateControl">Sample Rate</label>
+            <div class="setting-input-wrap">
+              <input
+                id="sampleRateControl"
+                type="number"
+                min="50"
+                max="2000"
+                step="1"
+                value="250"
+              />
+              <span>Hz</span>
+            </div>
+          </div>
+
+          <div class="display-setting">
+            <label for="windowSecondsControl">Window Seconds</label>
+            <div class="setting-input-wrap">
+              <input
+                id="windowSecondsControl"
+                type="number"
+                min="2"
+                max="30"
+                step="1"
+                value="8"
+              />
+              <span>sec</span>
+            </div>
+          </div>
+
+          <div class="display-setting auto-scale-setting">
+            <label for="autoScaleControl">Auto Scale</label>
+            <label class="switch" title="Auto Scale">
+              <input id="autoScaleControl" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div id="fixedCenterSetting" class="display-setting">
+            <label for="fixedCenterControl">Fixed Center</label>
+            <div class="setting-input-wrap">
+              <input
+                id="fixedCenterControl"
+                type="number"
+                step="1"
+                value="2048"
+              />
+            </div>
+          </div>
+
+          <div id="fixedSpanSetting" class="display-setting">
+            <label for="fixedSpanControl">Fixed Span</label>
+            <div class="setting-input-wrap">
+              <input
+                id="fixedSpanControl"
+                type="number"
+                min="1"
+                step="1"
+                value="1200"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div class="range-row">
+          <span>Min: <b id="minValue">—</b></span>
+          <span>Max: <b id="maxValue">—</b></span>
+          <span>Buffer: <b id="bufferSize">0</b></span>
+        </div>
+      </section>
+    </main>
+
+    <script src="./Js/app.js"></script>
+    <script src="./Js/dark-theme.js"></script>
+    <script src="./Js/sw.js"></script>
+  </body>
+</html>

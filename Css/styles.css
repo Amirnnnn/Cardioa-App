@@ -1,0 +1,520 @@
+:root {
+  color-scheme: light;
+  /* Cardioa brand palette (from logo) */
+  --brand: #6bf0b0; /* logo mint */
+  --brand-strong: #17b06f; /* darker mint for text/lines on white */
+  --brand-ink: #0b3d29; /* text on mint fills */
+  --gray-logo: #c9c9c9; /* tagline gray from logo */
+
+  --bg: #ffffff;
+  --bg-gradient: linear-gradient(
+    230deg,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(232, 250, 240, 1) 19%,
+    rgba(255, 255, 255, 1) 37%,
+    rgba(141, 242, 183, 1) 60%,
+    rgba(235, 255, 247, 1) 81%,
+    rgba(141, 242, 183, 1) 99%
+  );
+  --panel: #ffffff;
+  --panel-alt: #f5fdf9;
+  --border: #e3ebe7;
+  --text: #1c2622;
+  --muted: #7d8983;
+  --accent: var(--brand);
+  --accent-text: var(--brand-strong);
+  --accent-soft: rgba(107, 240, 176, 0.16);
+  --danger: #e5484d;
+  --warning: #e0a526;
+  --glass-blur: 7.4px;
+  font-family: Inter, Vazirmatn, "Segoe UI", Tahoma, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  min-height: 100%;
+  background-color: var(--bg);
+  background-image: var(--bg-gradient);
+  background-attachment: fixed;
+}
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(
+      circle at 18% 0%,
+      rgba(107, 240, 176, 0.14),
+      transparent 28rem
+    ),
+    radial-gradient(
+      circle at 100% 42%,
+      rgba(107, 240, 176, 0.08),
+      transparent 32rem
+    );
+  color: var(--text);
+}
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(1220px, calc(100% - 28px));
+  margin: 0 auto;
+  padding: 24px 0 52px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+  min-height: 84px;
+}
+
+.brand-area {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  min-width: 0;
+  font-size: 4rem;
+}
+.brand-logo {
+  width: 235px;
+  max-width: 44vw;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+.brand-copy {
+  border-right: 1px solid var(--border);
+  padding-right: 20px;
+}
+.brand-copy p {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.eyebrow {
+  color: var(--accent-text);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  direction: ltr;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+h2 {
+  margin-bottom: 6px;
+  font-size: 1.02rem;
+}
+.muted {
+  color: var(--muted);
+  margin-bottom: 0;
+}
+
+/* ===== Glass surfaces ===== */
+.panel {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62),
+    rgba(255, 255, 255, 0.28)
+  );
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow:
+    0 8px 32px rgba(23, 176, 111, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  margin-bottom: 16px;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+.compact-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.panel-title-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62),
+    rgba(255, 255, 255, 0.28)
+  );
+  padding: 9px 13px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  box-shadow:
+    0 8px 32px rgba(23, 176, 111, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+.badge .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--danger);
+}
+.badge.online {
+  border-color: rgba(23, 176, 111, 0.35);
+}
+.badge.online .dot {
+  background: var(--brand-strong);
+  box-shadow: 0 0 12px rgba(107, 240, 176, 0.9);
+}
+.badge.connecting .dot {
+  background: var(--warning);
+}
+
+.button-row,
+.chart-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.btn {
+  border: 1px solid transparent;
+  border-radius: 11px;
+  min-height: 42px;
+  padding: 0 16px;
+  cursor: pointer;
+  color: var(--text);
+  background: #eef3f0;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease,
+    opacity 0.12s ease,
+    border-color 0.12s ease;
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.btn.primary {
+  background: var(--accent);
+  color: var(--brand-ink);
+  font-weight: 850;
+  box-shadow: 0 6px 18px rgba(107, 240, 176, 0.45);
+}
+.btn.secondary {
+  background: var(--accent-soft);
+  border-color: rgba(23, 176, 111, 0.3);
+  color: #0e7a4c;
+}
+.btn.danger {
+  background: rgba(121, 119, 119, 0.429);
+  border-color: rgba(16, 6, 6, 0);
+  color: #232323;
+}
+.btn.ghost {
+  border-color: var(--border);
+  background: #fff;
+  color: var(--text);
+}
+.btn.ghost:hover:not(:disabled) {
+  border-color: var(--brand-strong);
+}
+.btn.small {
+  min-height: 36px;
+  padding: 0 12px;
+  font-size: 0.86rem;
+}
+
+.message {
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  font-size: 0.86rem;
+  line-height: 1.7;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.message[hidden] {
+  display: none;
+}
+.message.info {
+  color: #3d5248;
+  background: #f3f8f5;
+}
+.message.success {
+  color: #0e7a4c;
+  background: rgba(107, 240, 176, 0.16);
+  border-color: rgba(23, 176, 111, 0.35);
+}
+.message.error {
+  color: #a82a30;
+  background: rgba(229, 72, 77, 0.07);
+  border-color: rgba(229, 72, 77, 0.3);
+}
+.message.warning {
+  color: #8a6210;
+  background: rgba(224, 165, 38, 0.1);
+  border-color: rgba(224, 165, 38, 0.35);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat-card {
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.62),
+    rgba(255, 255, 255, 0.28)
+  );
+  border-radius: 14px;
+  padding: 13px;
+  box-shadow:
+    0 8px 32px rgba(23, 176, 111, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+.stat-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.76rem;
+  margin-bottom: 6px;
+}
+.stat-card strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: ltr;
+  text-align: right;
+}
+
+/* Heart-rate card: mint-tinted glass */
+.heart-rate-card {
+  border-color: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(
+    135deg,
+    rgba(107, 240, 176, 0.45),
+    rgba(255, 255, 255, 0.25)
+  );
+}
+.heart-rate-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  direction: ltr;
+}
+.heart-rate-value strong {
+  color: var(--accent-text);
+  font-size: 1.55rem;
+  line-height: 1;
+  text-align: left;
+  overflow: visible;
+}
+.heart-rate-value em {
+  color: var(--muted);
+  font-style: normal;
+  font-size: 0.72rem;
+}
+
+/* The ECG canvas paints its own background in app.js (#F5E5D6);
+   this value is only a fallback while the canvas loads. */
+.canvas-wrap {
+  position: relative;
+  width: 100%;
+  height: min(52vh, 455px);
+  min-height: 300px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(23, 176, 111, 0.35);
+  background: #f5e5d6;
+}
+#ecgCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.empty-hint {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  color: #9a8270;
+  font-size: 0.93rem;
+}
+
+/* ECG display controls (translucent only: they sit inside a blurred panel) */
+.display-settings {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border-radius: 14px;
+  direction: ltr;
+}
+.display-setting {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.display-setting > label:first-child {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-align: left;
+  direction: ltr;
+}
+.setting-input-wrap {
+  display: flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 11px;
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(23, 176, 111, 0.08);
+  border-radius: 9px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+.setting-input-wrap:focus-within {
+  border-color: var(--brand-strong);
+  box-shadow: 0 0 0 3px rgba(107, 240, 176, 0.3);
+}
+.setting-input-wrap input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  direction: ltr;
+}
+.setting-input-wrap input:disabled {
+  cursor: not-allowed;
+}
+.setting-input-wrap span {
+  color: var(--accent-text);
+  font-size: 0.72rem;
+  margin-left: 6px;
+}
+.auto-scale-setting {
+  justify-content: space-between;
+}
+.switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  display: inline-block;
+}
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--gray-logo);
+  border-radius: 50px;
+  transition: 0.25s;
+}
+.slider::before {
+  content: "";
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: 0.25s;
+}
+.switch input:checked + .slider {
+  background: var(--accent);
+}
+.switch input:checked + .slider::before {
+  transform: translateX(22px);
+  background: #fff;
+}
+.display-setting.disabled {
+  opacity: 0.45;
+}
+.display-setting.disabled .setting-input-wrap {
+  background: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.range-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin-top: 10px;
+  direction: ltr;
+}
+.range-row b {
+  color: var(--text);
+}
+
+.measurement-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.73rem;
+  line-height: 1.8;
+}
+
+
+/* ===== Show / hide data (stats) toggle ===== */
+.stats-grid[hidden] {
+  display: none;
+}
+/* Same size as the other buttons; softer look while the data is hidden */
+.btn.secondary[aria-pressed="false"] {
+  background: rgba(255, 255, 255, 0.45);
+  border-color: var(--border);
+  color: var(--muted);
+}

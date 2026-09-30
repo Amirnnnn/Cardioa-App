@@ -1,0 +1,121 @@
+@media (max-width: 950px) {
+  .display-settings {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .brand-copy {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .app-shell {
+    width: min(100% - 18px, 1220px);
+    padding-top: 14px;
+  }
+  .topbar {
+    align-items: center;
+  }
+  .brand-logo {
+    width: 185px;
+    max-width: 58vw;
+  }
+  .compact-controls {
+    align-items: stretch;
+  }
+  .compact-controls > div:first-child {
+    width: 100%;
+  }
+  .button-row {
+    width: 100%;
+  }
+  .button-row .btn {
+    flex: 1 1 135px;
+  }
+  .panel-title-row {
+    align-items: flex-start;
+  }
+  .chart-panel .panel-title-row {
+    flex-direction: column;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .canvas-wrap {
+    min-height: 330px;
+    height: 52vh;
+  }
+  .display-settings {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+@media (max-width: 390px) {
+  .display-settings {
+    grid-template-columns: 1fr;
+  }
+}
+/* Fallback for browsers without backdrop-filter support */
+@supports not (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .panel,
+  .stat-card,
+  .badge {
+    background: rgba(255, 255, 255, 0.92);
+  }
+}
+
+@media (max-width: 950px) {
+  .display-settings {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .brand-copy {
+    display: none;
+  }
+}
+@media (max-width: 650px) {
+  .app-shell {
+    width: min(100% - 18px, 1220px);
+    padding-top: 14px;
+  }
+  .topbar {
+    align-items: center;
+  }
+  .brand-logo {
+    width: 185px;
+    max-width: 58vw;
+  }
+  .compact-controls {
+    align-items: stretch;
+  }
+  .compact-controls > div:first-child {
+    width: 100%;
+  }
+  .button-row {
+    width: 100%;
+  }
+  .button-row .btn {
+    flex: 1 1 135px;
+  }
+  .panel-title-row {
+    align-items: flex-start;
+  }
+  .chart-panel .panel-title-row {
+    flex-direction: column;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .canvas-wrap {
+    min-height: 330px;
+    height: 52vh;
+  }
+  .display-settings {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+}
+@media (max-width: 390px) {
+  .display-settings {
+    grid-template-columns: 1fr;
+  }
+}

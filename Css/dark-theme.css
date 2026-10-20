@@ -441,3 +441,10 @@
 }
 :root[data-theme="dark"] .dt-toggle .dt-sun { display: block; }
 :root[data-theme="dark"] .dt-toggle .dt-moon { display: none; }
+
+/* V7: preserve contrast for the new filter-strength dropdown in dark mode. */
+[data-theme="dark"] .filter-strength-select {
+  background: var(--dk-field-bg);
+  border-color: var(--dk-field-border);
+  color: var(--text);
+}

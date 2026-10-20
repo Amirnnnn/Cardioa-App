@@ -12,11 +12,11 @@
       content="Cardioa - نمایش زنده ECG تک‌کاناله از طریق Bluetooth Low Energy"
     />
     <link rel="manifest" href="./manifest.webmanifest" />
-    <link rel="icon" href="./icons/Cardioa_Icon.png" />
-    <link rel="stylesheet" href="./Css/dark-theme.css" />
+    <link rel="icon" href="./icons/cardioa_icon.png" />
     <link rel="stylesheet" href="./Css/font-style.css" />
-    <link rel="stylesheet" href="./Css/responsive.css" />
     <link rel="stylesheet" href="./Css/styles.css" />
+    <link rel="stylesheet" href="./Css/responsive.css" />
+    <link rel="stylesheet" href="./Css/dark-theme.css" />
     <title>Cardioa | ECG Monitor</title>
   </head>
   <body>
@@ -87,6 +87,15 @@
           <span>Packetها</span><strong id="packetCount">0</strong>
         </article>
         <article class="stat-card">
+          <span>نمونه‌های گم‌شده</span><strong id="lostCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>بستهٔ نامعتبر</span><strong id="badPacketCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>بستهٔ تکراری/قدیمی</span><strong id="outOfOrderCount">0</strong>
+        </article>
+        <article class="stat-card">
           <span>نرخ دریافتی</span><strong id="rxRate">0 Hz</strong>
         </article>
         <article class="stat-card">
@@ -125,7 +134,9 @@
                 min="50"
                 max="2000"
                 step="1"
-                value="250"
+                value="200"
+                disabled
+                title="در V3 نرخ نمونه‌برداری روی برد ثابت است"
               />
               <span>Hz</span>
             </div>
@@ -154,6 +165,30 @@
             </label>
           </div>
 
+          <div class="display-setting auto-scale-setting">
+            <label for="invertDisplayControl">Invert ECG View</label>
+            <label class="switch" title="فقط نمایش زنده و پرینت را معکوس می‌کند؛ CSV خام تغییر نمی‌کند">
+              <input id="invertDisplayControl" type="checkbox" checked />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="display-setting auto-scale-setting">
+            <label for="noiseFilterControl">Noise Filter</label>
+            <label class="switch" title="کاهش نویز فقط برای نمودار زنده و چاپ؛ CSV و BPM تغییر نمی‌کنند">
+              <input id="noiseFilterControl" type="checkbox" />
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div id="noiseFilterStrengthSetting" class="display-setting disabled">
+            <label for="noiseFilterStrengthControl">Filter Strength</label>
+            <select id="noiseFilterStrengthControl" class="filter-strength-select" disabled>
+              <option value="gentle">ملایم (پیشنهادی)</option>
+              <option value="stronger">بیشتر</option>
+            </select>
+          </div>
+
           <div id="fixedCenterSetting" class="display-setting">
             <label for="fixedCenterControl">Fixed Center</label>
             <div class="setting-input-wrap">
@@ -180,6 +215,8 @@
           </div>
         </div>
 
+        <p class="noise-filter-note">فیلتر فقط روی نمایش و پرینت اثر دارد؛ دادهٔ خام CSV و محاسبهٔ BPM تغییر نمی‌کنند. حالت «بیشتر» ممکن است قله‌های QRS را کمی نرم کند. مناسب تشخیص پزشکی نیست.</p>
+
         <div class="range-row">
           <span>Min: <b id="minValue">—</b></span>
           <span>Max: <b id="maxValue">—</b></span>
@@ -188,8 +225,10 @@
       </section>
     </main>
 
+    <script src="./Js/ecg-protocol-v3.js"></script>
+    <script src="./Js/ecg-display-filter.js"></script>
     <script src="./Js/app.js"></script>
     <script src="./Js/dark-theme.js"></script>
-    <script src="./Js/sw.js"></script>
+
   </body>
 </html>

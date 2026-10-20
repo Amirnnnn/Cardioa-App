@@ -9,15 +9,28 @@
   const CONFIG = {
     serviceUuid: "4fafc201-1fb5-459e-8fcc-c5c9c331914b",
     characteristicUuid: "beb5483e-36e1-4688-b7f5-ea07361b26a8",
-    dataFormat: "UINT16_LE",
-    sampleRateHz: 250,
+    dataFormat: "V3_PACKED_12BIT",
+    sampleRateHz: 200,
     windowSeconds: 8,
     autoScale: true,
+    invertDisplay: true, // only the chart/print orientation; raw CSV/BPM unchanged
+    noiseFilterEnabled: false, // DISPLAY/PRINT ONLY; never affect CSV, HR or BLE
+    noiseFilterStrength: "gentle", // gentle: 5 taps; stronger: 7 taps
     fixedCenter: 2048,
     fixedSpan: 1200
   };
 
-  const DISPLAY_SETTINGS_KEY = "cardioa-display-settings-v4";
+  // One BLE notification = 20 bytes = index (u16 LE) + 12 x packed 12-bit ADC.
+  // 200 Hz is fixed by the V3 firmware; changing display controls never changes
+  // the ESP32 sampling clock.
+  const protocol = window.CardioaEcgV3;
+  if (!protocol) throw new Error("Js/ecg-protocol-v3.js must be loaded before app.js");
+
+  const displayFilter = window.CardioaDisplayFilter;
+  if (!displayFilter) throw new Error("Js/ecg-display-filter.js must be loaded before app.js");
+
+  // Keep the same key to migrate the previous orientation setting.
+  const DISPLAY_SETTINGS_KEY = "cardioa-display-settings-v5";
 
   const $ = (id) => document.getElementById(id);
   const ui = {
@@ -38,6 +51,9 @@
     lastValue: $("lastValue"),
     sampleCount: $("sampleCount"),
     packetCount: $("packetCount"),
+    lostCount: $("lostCount"),
+    badPacketCount: $("badPacketCount"),
+    outOfOrderCount: $("outOfOrderCount"),
     rxRate: $("rxRate"),
     recordState: $("recordState"),
     minValue: $("minValue"),
@@ -48,6 +64,10 @@
     sampleRateControl: $("sampleRateControl"),
     windowSecondsControl: $("windowSecondsControl"),
     autoScaleControl: $("autoScaleControl"),
+    invertDisplayControl: $("invertDisplayControl"),
+    noiseFilterControl: $("noiseFilterControl"),
+    noiseFilterStrengthControl: $("noiseFilterStrengthControl"),
+    noiseFilterStrengthSetting: $("noiseFilterStrengthSetting"),
     fixedCenterControl: $("fixedCenterControl"),
     fixedSpanControl: $("fixedSpanControl"),
     fixedCenterSetting: $("fixedCenterSetting"),
@@ -63,13 +83,20 @@
   let samples = [];
   let totalSamples = 0;
   let packets = 0;
+  let lostSamples = 0;
+  let badPackets = 0;
+  let outOfOrderPackets = 0;
+  let lastGoodPacketAt = 0;
+  let bleConnectedAt = 0;
+  let stalledWarningVisible = false;
+  const frameTracker = protocol.createTracker();
 
   let lastRateTime = performance.now();
   let samplesAtLastRate = 0;
 
   let recording = false;
   let recorded = [];
-  let recordStart = 0;
+  let recordBasePosition = null;
 
   let demoTimer = null;
   let demoIndex = 0;
@@ -242,13 +269,20 @@
   }
 
   function saveDisplaySettings() {
-    localStorage.setItem(DISPLAY_SETTINGS_KEY, JSON.stringify({
-      sampleRateHz: CONFIG.sampleRateHz,
-      windowSeconds: CONFIG.windowSeconds,
-      autoScale: CONFIG.autoScale,
-      fixedCenter: CONFIG.fixedCenter,
-      fixedSpan: CONFIG.fixedSpan
-    }));
+    try {
+      localStorage.setItem(DISPLAY_SETTINGS_KEY, JSON.stringify({
+        windowSeconds: CONFIG.windowSeconds,
+        autoScale: CONFIG.autoScale,
+        invertDisplay: CONFIG.invertDisplay,
+        noiseFilterEnabled: CONFIG.noiseFilterEnabled,
+        noiseFilterStrength: CONFIG.noiseFilterStrength,
+        fixedCenter: CONFIG.fixedCenter,
+        fixedSpan: CONFIG.fixedSpan
+      }));
+    } catch (error) {
+      // Storage may be unavailable in private sessions; live ECG must continue.
+      console.warn("Cardioa: could not save display settings", error);
+    }
   }
 
   function loadDisplaySettings() {
@@ -256,9 +290,14 @@
       const saved = JSON.parse(localStorage.getItem(DISPLAY_SETTINGS_KEY) || "null");
       if (!saved) return;
 
-      CONFIG.sampleRateHz = clampNumber(saved.sampleRateHz, 50, 2000, CONFIG.sampleRateHz);
+      // Ignore saved sample rates: V3 hardware is always 200 Hz.
       CONFIG.windowSeconds = clampNumber(saved.windowSeconds, 2, 30, CONFIG.windowSeconds);
       CONFIG.autoScale = typeof saved.autoScale === "boolean" ? saved.autoScale : CONFIG.autoScale;
+      CONFIG.invertDisplay = typeof saved.invertDisplay === "boolean" ? saved.invertDisplay : CONFIG.invertDisplay;
+      CONFIG.noiseFilterEnabled = typeof saved.noiseFilterEnabled === "boolean"
+        ? saved.noiseFilterEnabled : CONFIG.noiseFilterEnabled;
+      CONFIG.noiseFilterStrength = ["gentle", "stronger"].includes(saved.noiseFilterStrength)
+        ? saved.noiseFilterStrength : CONFIG.noiseFilterStrength;
 
       const center = Number(saved.fixedCenter);
       if (Number.isFinite(center)) CONFIG.fixedCenter = center;
@@ -273,6 +312,10 @@
     ui.sampleRateControl.value = String(CONFIG.sampleRateHz);
     ui.windowSecondsControl.value = String(CONFIG.windowSeconds);
     ui.autoScaleControl.checked = CONFIG.autoScale;
+    ui.invertDisplayControl.checked = CONFIG.invertDisplay;
+    ui.noiseFilterControl.checked = CONFIG.noiseFilterEnabled;
+    ui.noiseFilterStrengthControl.value = CONFIG.noiseFilterStrength;
+    updateNoiseFilterControls();
     ui.fixedCenterControl.value = String(CONFIG.fixedCenter);
     ui.fixedSpanControl.value = String(CONFIG.fixedSpan);
     updateFixedScaleState();
@@ -288,6 +331,20 @@
     ui.fixedSpanSetting.classList.toggle("disabled", disabled);
   }
 
+  function updateNoiseFilterControls() {
+    const off = !CONFIG.noiseFilterEnabled;
+    ui.noiseFilterStrengthControl.disabled = off;
+    ui.noiseFilterStrengthSetting.classList.toggle("disabled", off);
+  }
+
+  function getDisplaySamples() {
+    // Calculate from RAW samples for every render/print. Switching the
+    // option on/off is instant; no changes to storage, clock, HR, or BLE.
+    return CONFIG.noiseFilterEnabled
+      ? displayFilter.filter(samples, CONFIG.noiseFilterStrength)
+      : samples;
+  }
+
   function trimSampleBuffer() {
     const limit = maxBufferSamples();
     if (samples.length > limit) {
@@ -296,105 +353,54 @@
     ui.bufferSize.textContent = samples.length.toLocaleString("en-US");
   }
 
-  function isProbablyAscii(bytes) {
-    if (!bytes.length) return false;
-    let printable = 0;
-
-    for (const b of bytes) {
-      if ((b >= 32 && b <= 126) || b === 10 || b === 13 || b === 9) {
-        printable++;
-      }
-    }
-
-    return printable / bytes.length > 0.88;
-  }
-
-  function parseData(dataView, mode) {
-    const bytes = new Uint8Array(
-      dataView.buffer,
-      dataView.byteOffset,
-      dataView.byteLength
-    );
-
-    let actualMode = mode;
-
-    if (actualMode === "AUTO") {
-      if (isProbablyAscii(bytes)) actualMode = "ASCII";
-      else if (dataView.byteLength % 2 === 0) actualMode = "UINT16_LE";
-      else actualMode = "UINT8";
-    }
-
-    const out = [];
-
-    if (actualMode === "ASCII") {
-      const text = new TextDecoder().decode(bytes);
-
-      for (const part of text.trim().split(/[\s,;|]+/)) {
-        if (!part) continue;
-        const n = Number(part);
-        if (Number.isFinite(n)) out.push(n);
-      }
-    } else if (actualMode === "UINT8") {
-      for (let i = 0; i < dataView.byteLength; i++) {
-        out.push(dataView.getUint8(i));
-      }
-    } else if (actualMode === "UINT16_LE") {
-      for (let i = 0; i + 1 < dataView.byteLength; i += 2) {
-        out.push(dataView.getUint16(i, true));
-      }
-    } else if (actualMode === "INT16_LE") {
-      for (let i = 0; i + 1 < dataView.byteLength; i += 2) {
-        out.push(dataView.getInt16(i, true));
-      }
-    } else if (actualMode === "FLOAT32_LE") {
-      for (let i = 0; i + 3 < dataView.byteLength; i += 4) {
-        const n = dataView.getFloat32(i, true);
-        if (Number.isFinite(n)) out.push(n);
-      }
-    }
-
-    return out;
-  }
-
   function formatValue(n) {
     if (!Number.isFinite(n)) return "—";
     if (Math.abs(n) >= 100) return Math.round(n).toString();
     return n.toFixed(3);
   }
 
-  function addSamples(newSamples) {
+  function addSamples(newSamples, startPosition = null) {
     if (!newSamples.length) return;
 
-    const limit = maxBufferSamples();
+    // Sample-based rather than browser-arrival time. All 12 values in a
+    // notification are acquired 5 ms apart, NOT at the same event timestamp.
+    const firstPosition = startPosition === null ? totalSamples : startPosition;
 
-    for (const value of newSamples) {
+    for (let i = 0; i < newSamples.length; ++i) {
+      const value = newSamples[i];
       if (!Number.isFinite(value)) continue;
 
       samples.push(value);
       totalSamples++;
-
       processHeartRateSample(value);
 
       if (recording) {
+        const position = firstPosition + i;
+        if (recordBasePosition === null) recordBasePosition = position;
         recorded.push({
-          index: totalSamples,
-          t_ms: performance.now() - recordStart,
+          index: position,
+          t_ms: (position - recordBasePosition) * 1000 / CONFIG.sampleRateHz,
           value
         });
       }
     }
 
-    if (samples.length > limit) {
-      samples.splice(0, samples.length - limit);
-    }
-
-    ui.lastValue.textContent = formatValue(samples[samples.length - 1]);
+    trimSampleBuffer();
+    ui.lastValue.textContent = formatValue(newSamples[newSamples.length - 1]);
     ui.sampleCount.textContent = totalSamples.toLocaleString("en-US");
-    ui.bufferSize.textContent = samples.length.toLocaleString("en-US");
     ui.emptyHint.style.display = samples.length ? "none" : "grid";
     ui.printBtn.disabled = samples.length < 2;
 
     updateStats();
+  }
+
+  function markGap(missing) {
+    // Add placeholder slots for missing acquisition time, without fabricating
+    // a voltage. Large gaps are capped at the visible window length.
+    const slots = Math.min(missing, maxBufferSamples());
+    for (let i = 0; i < slots; ++i) samples.push(null);
+    trimSampleBuffer();
+    resetHeartRateDetector();
   }
 
   function updateStats() {
@@ -409,6 +415,7 @@
     let max = -Infinity;
 
     for (const v of samples) {
+      if (!Number.isFinite(v)) continue;
       if (v < min) min = v;
       if (v > max) max = v;
     }
@@ -432,7 +439,38 @@
   function handleCharacteristicValueChanged(event) {
     packets++;
     ui.packetCount.textContent = packets.toLocaleString("en-US");
-    addSamples(parseData(event.target.value, CONFIG.dataFormat));
+
+    let frame;
+    try {
+      frame = protocol.decodeNotification(event.target.value);
+    } catch (error) {
+      ++badPackets;
+      ui.badPacketCount.textContent = badPackets.toLocaleString("en-US");
+      console.warn("Cardioa: invalid V3 notification", error);
+      setMessage("بستهٔ دریافتی با فرمت V3 سازگار نیست (۲۰ بایت لازم است).", "error");
+      return;
+    }
+
+    const continuity = frameTracker.accept(frame);
+    if (!continuity.accepted) {
+      ++outOfOrderPackets;
+      ui.outOfOrderCount.textContent = outOfOrderPackets.toLocaleString("en-US");
+      console.warn("Cardioa: older/duplicate packet", frame.firstIndex);
+      return;
+    }
+
+    if (continuity.missing > 0) {
+      lostSamples += continuity.missing;
+      ui.lostCount.textContent = lostSamples.toLocaleString("en-US");
+      markGap(continuity.missing);
+    }
+
+    lastGoodPacketAt = performance.now();
+    if (stalledWarningVisible) {
+      stalledWarningVisible = false;
+      setMessage("دریافت ECG ادامه پیدا کرد.", "success");
+    }
+    addSamples(frame.samples, continuity.startPosition);
   }
 
   async function connectBle() {
@@ -453,6 +491,11 @@
     }
 
     stopDemo();
+    finishRecordingOnSourceChange();
+    frameTracker.reset();
+    lastGoodPacketAt = 0;
+    bleConnectedAt = 0;
+    stalledWarningVisible = false;
     resetHeartRateDetector();
     setConnectionState("connecting", "در حال اتصال...");
     ui.connectBtn.disabled = true;
@@ -490,6 +533,7 @@
       );
 
       await ecgCharacteristic.startNotifications();
+      bleConnectedAt = performance.now();
 
       ui.deviceName.textContent =
         bluetoothDevice.name || "Cardioa Device";
@@ -536,9 +580,14 @@
 
   function handleDisconnected() {
     cleanupBle(false);
+    finishRecordingOnSourceChange();
+    frameTracker.reset();
+    lastGoodPacketAt = 0;
+    bleConnectedAt = 0;
+    stalledWarningVisible = false;
     resetHeartRateDetector();
     setConnectionState("offline", "قطع");
-    setMessage("ارتباط با دستگاه قطع شد.", "warning");
+    setMessage("ارتباط با دستگاه قطع شد. ضبط فعلی متوقف شد.", "warning");
   }
 
   function cleanupBle(disconnectGatt = true) {
@@ -564,6 +613,11 @@
 
   function disconnectBle() {
     cleanupBle(true);
+    finishRecordingOnSourceChange();
+    frameTracker.reset();
+    lastGoodPacketAt = 0;
+    bleConnectedAt = 0;
+    stalledWarningVisible = false;
     resetHeartRateDetector();
     setConnectionState("offline", "قطع");
     setMessage("اتصال با دستگاه قطع شد.", "info");
@@ -573,6 +627,13 @@
     samples = [];
     totalSamples = 0;
     packets = 0;
+    lostSamples = 0;
+    badPackets = 0;
+    outOfOrderPackets = 0;
+    frameTracker.reset();
+    lastGoodPacketAt = 0;
+    bleConnectedAt = 0;
+    finishRecordingOnSourceChange();
     samplesAtLastRate = 0;
     lastRateTime = performance.now();
 
@@ -581,6 +642,9 @@
     ui.lastValue.textContent = "—";
     ui.sampleCount.textContent = "0";
     ui.packetCount.textContent = "0";
+    ui.lostCount.textContent = "0";
+    ui.badPacketCount.textContent = "0";
+    ui.outOfOrderCount.textContent = "0";
     ui.rxRate.textContent = "0 Hz";
     ui.minValue.textContent = "—";
     ui.maxValue.textContent = "—";
@@ -614,6 +678,8 @@
       disconnectBle();
     }
 
+    finishRecordingOnSourceChange();
+    frameTracker.reset();
     resetHeartRateDetector();
 
     ui.demoBtn.textContent = "توقف تست";
@@ -653,7 +719,7 @@
       if (chunk.length) {
         packets++;
         ui.packetCount.textContent = packets.toLocaleString("en-US");
-        addSamples(chunk);
+        addSamples(chunk, demoIndex - chunk.length);
       }
 
       demoTimer = requestAnimationFrame(tick);
@@ -676,16 +742,18 @@
     }
   }
 
-  function restartDemoIfRunning() {
-    if (!demoTimer) return;
-    stopDemo();
-    startDemo();
+  function finishRecordingOnSourceChange() {
+    if (!recording) return;
+    recording = false;
+    ui.recordBtn.textContent = "شروع ضبط";
+    ui.recordState.textContent = "متوقف";
+    ui.exportBtn.disabled = recorded.length === 0;
   }
 
   function toggleRecording() {
     if (!recording) {
       recorded = [];
-      recordStart = performance.now();
+      recordBasePosition = null;
       recording = true;
 
       ui.recordBtn.textContent = "توقف ضبط";
@@ -756,8 +824,13 @@
     let max = -Infinity;
 
     for (const value of data) {
+      if (!Number.isFinite(value)) continue;
       if (value < min) min = value;
       if (value > max) max = value;
+    }
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return { min: CONFIG.fixedCenter - CONFIG.fixedSpan,
+               max: CONFIG.fixedCenter + CONFIG.fixedSpan };
     }
 
     let span = max - min;
@@ -775,7 +848,7 @@
   }
 
   function createPrintImage() {
-    const data = samples.slice();
+    const data = getDisplaySamples().slice();
 
     if (data.length < 2) {
       return null;
@@ -874,13 +947,17 @@
 
     const denominator = Math.max(1, data.length - 1);
 
+    let moveNext = true;
     for (let i = 0; i < data.length; i++) {
+      if (!Number.isFinite(data[i])) { moveNext = true; continue; }
       const x = chart.x + (i / denominator) * chart.width;
       const normalized = (data[i] - min) / range;
-      const y = chart.y + chart.height - normalized * chart.height;
-
-      if (i === 0) c.moveTo(x, y);
+      const y = CONFIG.invertDisplay
+        ? chart.y + normalized * chart.height
+        : chart.y + chart.height - normalized * chart.height;
+      if (moveNext) c.moveTo(x, y);
       else c.lineTo(x, y);
+      moveNext = false;
     }
 
     c.stroke();
@@ -892,7 +969,7 @@
     c.fillStyle = "#60736a";
     c.font = "18px Segoe UI, Arial, sans-serif";
     c.fillText(
-      "Cardioa ECG snapshot — estimated heart rate; not intended for medical diagnosis.",
+      `Cardioa ECG — ${CONFIG.noiseFilterEnabled ? "display filter: " + CONFIG.noiseFilterStrength + "; " : ""}${CONFIG.invertDisplay ? "view inverted; " : ""}raw CSV unchanged; not for diagnosis.`,
       80,
       858
     );
@@ -1040,8 +1117,9 @@
 
   function drawWaveform(width, height) {
     if (samples.length < 2) return;
+    const data = getDisplaySamples();
 
-    const { min, max } = getDisplayRange(samples);
+    const { min, max } = getDisplayRange(data);
     const range = Math.max(1e-12, max - min);
     const leftPad = 4;
     const usableW = width - 8;
@@ -1054,48 +1132,40 @@
     ctx.shadowBlur = 5;
     ctx.beginPath();
 
-    const denominator = Math.max(1, samples.length - 1);
+    const denominator = Math.max(1, data.length - 1);
 
-    for (let i = 0; i < samples.length; i++) {
+    let moveNext = true;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i];
+      if (!Number.isFinite(v)) { moveNext = true; continue; }
       const x = leftPad + (i / denominator) * usableW;
-      const y =
-        height -
-        ((samples[i] - min) / range) * height;
-
-      if (i === 0) ctx.moveTo(x, y);
+      const normalized = (v - min) / range;
+      const y = CONFIG.invertDisplay
+        ? normalized * height
+        : height - normalized * height;
+      if (moveNext) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
+      moveNext = false;
     }
 
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
 
-  function renderLoop() {
-    const { width, height } = resizeCanvas();
-
-    drawGrid(width, height);
-    drawWaveform(width, height);
-
+  let lastDrawAt = 0;
+  function renderLoop(timestamp) {
+    if (timestamp - lastDrawAt >= 1000 / 30) {
+      lastDrawAt = timestamp;
+      const { width, height } = resizeCanvas();
+      drawGrid(width, height);
+      drawWaveform(width, height);
+    }
     requestAnimationFrame(renderLoop);
   }
 
   function bindDisplayControls() {
-    ui.sampleRateControl.addEventListener("change", () => {
-      const value = clampNumber(
-        ui.sampleRateControl.value,
-        50,
-        2000,
-        CONFIG.sampleRateHz
-      );
-
-      CONFIG.sampleRateHz = Math.round(value);
-      ui.sampleRateControl.value = String(CONFIG.sampleRateHz);
-
-      trimSampleBuffer();
-      resetHeartRateDetector();
-      saveDisplaySettings();
-      restartDemoIfRunning();
-    });
+    // Sample rate reflects acquisition hardware; editing this cannot change ESP32.
+    ui.sampleRateControl.disabled = true;
 
     ui.windowSecondsControl.addEventListener("change", () => {
       const value = clampNumber(
@@ -1115,6 +1185,24 @@
     ui.autoScaleControl.addEventListener("change", () => {
       CONFIG.autoScale = ui.autoScaleControl.checked;
       updateFixedScaleState();
+      saveDisplaySettings();
+    });
+
+    ui.invertDisplayControl.addEventListener("change", () => {
+      CONFIG.invertDisplay = ui.invertDisplayControl.checked;
+      saveDisplaySettings();
+    });
+
+    ui.noiseFilterControl.addEventListener("change", () => {
+      CONFIG.noiseFilterEnabled = ui.noiseFilterControl.checked;
+      updateNoiseFilterControls();
+      saveDisplaySettings();
+    });
+
+    ui.noiseFilterStrengthControl.addEventListener("change", () => {
+      const value = ui.noiseFilterStrengthControl.value;
+      CONFIG.noiseFilterStrength = value === "stronger" ? "stronger" : "gentle";
+      ui.noiseFilterStrengthControl.value = CONFIG.noiseFilterStrength;
       saveDisplaySettings();
     });
 
@@ -1152,6 +1240,24 @@
     ui.statsToggleBtn.setAttribute("aria-pressed", String(willShow));
   }
 
+  function checkStreamHealth() {
+    const now = performance.now();
+    const elapsed = (now - lastRateTime) / 1000;
+    if (elapsed >= 1) {
+      const received = (totalSamples - samplesAtLastRate) / elapsed;
+      samplesAtLastRate = totalSamples;
+      lastRateTime = now;
+      ui.rxRate.textContent = `${received.toFixed(0)} Hz`;
+    }
+
+    const since = lastGoodPacketAt || bleConnectedAt;
+    if (bluetoothDevice?.gatt?.connected && since > 0 &&
+        now - since > 2500 && !stalledWarningVisible) {
+      stalledWarningVisible = true;
+      setMessage("بیش از ۲٫۵ ثانیه بستهٔ معتبر دریافت نشده؛ وضعیت notify_calls و ble_errors برد را بررسی کنید.", "warning");
+    }
+  }
+
   function bindEvents() {
     ui.connectBtn.addEventListener("click", connectBle);
     ui.disconnectBtn.addEventListener("click", disconnectBle);
@@ -1179,6 +1285,7 @@
     resetHeartRateDetector();
     bindEvents();
     renderLoop();
+    setInterval(checkStreamHealth, 1000);
     setMessage("");
 
     if ("serviceWorker" in navigator) {

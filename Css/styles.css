@@ -379,7 +379,7 @@ h2 {
 /* ECG display controls (translucent only: they sit inside a blurred panel) */
 .display-settings {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 12px;
   margin-top: 16px;
   padding: 14px;
@@ -517,4 +517,27 @@ h2 {
   background: rgba(255, 255, 255, 0.45);
   border-color: var(--border);
   color: var(--muted);
+}
+
+/* V7: optional display-only ECG denoising controls */
+.filter-strength-select {
+  min-height: 42px;
+  width: 100%;
+  padding: 0 8px;
+  border: 1px solid rgba(23, 176, 111, .22);
+  border-radius: 9px;
+  background: rgba(255,255,255,.62);
+  color: var(--text);
+  font: inherit;
+  font-size: .83rem;
+  text-align: right;
+  direction: rtl;
+}
+.filter-strength-select:disabled { cursor: not-allowed; opacity: .65; }
+.noise-filter-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: .79rem;
+  line-height: 1.8;
+  text-align: right;
 }
